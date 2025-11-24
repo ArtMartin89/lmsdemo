@@ -17,12 +17,16 @@ const AdminCourses: React.FC = () => {
 
   const loadCourses = async () => {
     try {
+      setLoading(true);
       const data = await adminApi.listCourses();
       console.log('Loaded courses:', data);
-      setCourses(data);
-    } catch (error) {
+      setCourses(Array.isArray(data) ? data : []);
+    } catch (error: any) {
       console.error('Failed to load courses:', error);
-      alert('Ошибка загрузки курсов. Проверьте консоль браузера.');
+      console.error('Error details:', error.response?.data);
+      const errorMessage = error.response?.data?.detail || error.message || 'Ошибка загрузки курсов';
+      alert(`Ошибка загрузки курсов: ${errorMessage}`);
+      setCourses([]);
     } finally {
       setLoading(false);
     }

@@ -128,33 +128,74 @@ class StorageService:
         module_id: str, 
         lesson_id: str
     ) -> Optional[Dict[str, Any]]:
-        """Retrieve lesson content from storage"""
+        """Retrieve lesson content from storage (new structure)"""
         if settings.USE_LOCAL_STORAGE:
+            # Try new structure first
             file_path = self._get_file_path("courses", str(course_id), "modules", module_id, "lessons", lesson_id, "content.md")
-            if not file_path:
-                return None
-            with open(file_path, "r", encoding="utf-8") as f:
-                content = f.read()
-            return {
-                "lesson_id": lesson_id,
-                "module_id": module_id,
-                "course_id": str(course_id),
-                "content": content,
-                "content_type": "markdown"
-            }
+            if file_path:
+                with open(file_path, "r", encoding="utf-8") as f:
+                    content = f.read()
+                return {
+                    "lesson_id": lesson_id,
+                    "module_id": module_id,
+                    "course_id": str(course_id),
+                    "content": content,
+                    "content_type": "markdown"
+                }
+            
+            # Fallback to old structure for backward compatibility
+            # Extract lesson_number from lesson_id (format: Module_01_Lesson_01 -> 01)
+            try:
+                lesson_number_str = lesson_id.split("_Lesson_")[-1]
+                lesson_number = int(lesson_number_str)
+                old_path = self._get_file_path("lessons", module_id, f"lesson_{lesson_number:02d}.md")
+                if old_path:
+                    with open(old_path, "r", encoding="utf-8") as f:
+                        content = f.read()
+                    return {
+                        "lesson_id": lesson_id,
+                        "module_id": module_id,
+                        "course_id": str(course_id),
+                        "content": content,
+                        "content_type": "markdown"
+                    }
+            except (ValueError, IndexError):
+                pass
+            
+            return None
         else:
+            # Try new structure first
             blob_path = f"courses/{course_id}/modules/{module_id}/lessons/{lesson_id}/content.md"
             blob = self.bucket.blob(blob_path)
-            if not blob.exists():
-                return None
-            content = blob.download_as_text()
-            return {
-                "lesson_id": lesson_id,
-                "module_id": module_id,
-                "course_id": str(course_id),
-                "content": content,
-                "content_type": "markdown"
-            }
+            if blob.exists():
+                content = blob.download_as_text()
+                return {
+                    "lesson_id": lesson_id,
+                    "module_id": module_id,
+                    "course_id": str(course_id),
+                    "content": content,
+                    "content_type": "markdown"
+                }
+            
+            # Fallback to old structure
+            try:
+                lesson_number_str = lesson_id.split("_Lesson_")[-1]
+                lesson_number = int(lesson_number_str)
+                old_blob_path = f"lessons/{module_id}/lesson_{lesson_number:02d}.md"
+                old_blob = self.bucket.blob(old_blob_path)
+                if old_blob.exists():
+                    content = old_blob.download_as_text()
+                    return {
+                        "lesson_id": lesson_id,
+                        "module_id": module_id,
+                        "course_id": str(course_id),
+                        "content": content,
+                        "content_type": "markdown"
+                    }
+            except (ValueError, IndexError):
+                pass
+            
+            return None
     
     async def save_lesson_content(
         self,
@@ -319,20 +360,37 @@ class StorageService:
     
     # Test methods
     async def get_test_questions(self, course_id: UUID, module_id: str) -> Optional[Dict[str, Any]]:
-        """Retrieve test questions from storage"""
+        """Retrieve test questions from storage (with backward compatibility)"""
         if settings.USE_LOCAL_STORAGE:
+            # Try new structure first
             file_path = self._get_file_path("courses", str(course_id), "modules", module_id, "test", "questions.json")
-            if not file_path:
-                return None
-            with open(file_path, "r", encoding="utf-8") as f:
-                return json.load(f)
+            if file_path:
+                with open(file_path, "r", encoding="utf-8") as f:
+                    return json.load(f)
+            
+            # Fallback to old structure
+            old_path = self._get_file_path("tests", module_id, "test_questions.json")
+            if old_path:
+                with open(old_path, "r", encoding="utf-8") as f:
+                    return json.load(f)
+            
+            return None
         else:
+            # Try new structure first
             blob_path = f"courses/{course_id}/modules/{module_id}/test/questions.json"
             blob = self.bucket.blob(blob_path)
-            if not blob.exists():
-                return None
-            content = blob.download_as_text()
-            return json.loads(content)
+            if blob.exists():
+                content = blob.download_as_text()
+                return json.loads(content)
+            
+            # Fallback to old structure
+            old_blob_path = f"tests/{module_id}/test_questions.json"
+            old_blob = self.bucket.blob(old_blob_path)
+            if old_blob.exists():
+                content = old_blob.download_as_text()
+                return json.loads(content)
+            
+            return None
     
     async def save_test_questions(
         self,

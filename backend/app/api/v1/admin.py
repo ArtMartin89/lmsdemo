@@ -33,7 +33,20 @@ async def admin_list_courses(
 ):
     """List all courses (admin only)"""
     courses = await get_all_courses(db, include_inactive=True)
-    return courses
+    # Convert to response models to ensure proper serialization
+    result = []
+    for course in courses:
+        course_dict = {
+            "id": course.id,
+            "title": course.title,
+            "description": course.description or None,
+            "order_index": course.order_index,
+            "is_active": course.is_active,
+            "created_at": course.created_at,
+            "updated_at": course.updated_at
+        }
+        result.append(CourseResponse(**course_dict))
+    return result
 
 
 @router.get("/courses/{course_id}", response_model=CourseWithModules)
@@ -71,11 +84,38 @@ async def admin_get_course(
 async def admin_create_course(
     course_data: CourseCreate,
     db: AsyncSession = Depends(get_db),
+    storage_service: StorageService = Depends(get_storage_service),
     admin_user: User = Depends(get_current_admin_user)
 ):
     """Create a new course (admin only)"""
     course = await create_course(db, course_data.dict())
-    return course
+    
+    # Save course metadata to storage
+    metadata = {
+        "course_id": str(course.id),
+        "title": course.title,
+        "description": course.description or "",
+        "order_index": course.order_index,
+        "is_active": course.is_active,
+        "created_at": course.created_at.isoformat() if course.created_at else None,
+        "updated_at": course.updated_at.isoformat() if course.updated_at else None,
+        "settings": {
+            "completion_certificate": True,
+            "min_completion_percentage": 80
+        }
+    }
+    await storage_service.save_course_metadata(course.id, metadata)
+    
+    # Return properly serialized course
+    return CourseResponse(
+        id=course.id,
+        title=course.title,
+        description=course.description,
+        order_index=course.order_index,
+        is_active=course.is_active,
+        created_at=course.created_at,
+        updated_at=course.updated_at
+    )
 
 
 @router.put("/courses/{course_id}", response_model=CourseResponse)
@@ -83,6 +123,7 @@ async def admin_update_course(
     course_id: UUID,
     course_data: CourseUpdate,
     db: AsyncSession = Depends(get_db),
+    storage_service: StorageService = Depends(get_storage_service),
     admin_user: User = Depends(get_current_admin_user)
 ):
     """Update course (admin only)"""
@@ -92,7 +133,33 @@ async def admin_update_course(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Course not found"
         )
-    return course
+    
+    # Update course metadata in storage
+    metadata = {
+        "course_id": str(course.id),
+        "title": course.title,
+        "description": course.description or "",
+        "order_index": course.order_index,
+        "is_active": course.is_active,
+        "created_at": course.created_at.isoformat() if course.created_at else None,
+        "updated_at": course.updated_at.isoformat() if course.updated_at else None,
+        "settings": {
+            "completion_certificate": True,
+            "min_completion_percentage": 80
+        }
+    }
+    await storage_service.save_course_metadata(course.id, metadata)
+    
+    # Return properly serialized course
+    return CourseResponse(
+        id=course.id,
+        title=course.title,
+        description=course.description,
+        order_index=course.order_index,
+        is_active=course.is_active,
+        created_at=course.created_at,
+        updated_at=course.updated_at
+    )
 
 
 @router.delete("/courses/{course_id}", status_code=status.HTTP_204_NO_CONTENT)

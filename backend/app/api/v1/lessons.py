@@ -30,9 +30,40 @@ async def get_lesson(
     progress_service: ProgressService = Depends(get_progress_service)
 ):
     """Get lesson content"""
-    # Get lesson from DB
+    # Get lesson from DB or create if content exists
     lesson = await get_lesson_by_module_and_number(db, module_id, lesson_number)
-    if not lesson or not lesson.is_active:
+    
+    # If lesson doesn't exist in DB, try to get content and create lesson
+    if not lesson:
+        lesson_data = await content_service.get_lesson_content(module_id, lesson_number, db)
+        if lesson_data:
+            # Auto-create lesson in DB
+            from app.crud.lesson import create_lesson
+            from app.crud.module import get_module
+            
+            module = await get_module(db, module_id)
+            if not module:
+                raise HTTPException(
+                    status_code=status.HTTP_404_NOT_FOUND,
+                    detail="Module not found"
+                )
+            
+            lesson_id = f"{module_id}_Lesson_{lesson_number:02d}"
+            lesson_data_db = {
+                "id": lesson_id,
+                "module_id": module_id,
+                "lesson_number": lesson_number,
+                "title": f"Урок {lesson_number}",
+                "order_index": lesson_number,
+                "is_active": True
+            }
+            lesson = await create_lesson(db, lesson_data_db)
+        else:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=f"Lesson {lesson_number} not found"
+            )
+    elif not lesson.is_active:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail=f"Lesson {lesson_number} not found"
@@ -175,9 +206,37 @@ async def get_next_lesson(
     
     # Get next lesson
     next_lesson_number = progress.current_lesson + 1
-    lesson_content = await content_service.get_lesson_content(
-        module_id, next_lesson_number, db
-    )
+    
+    # Check if lesson exists in DB, if not try to auto-create from storage
+    lesson = await get_lesson_by_module_and_number(db, module_id, next_lesson_number)
+    if not lesson:
+        # Try to get content first
+        lesson_content = await content_service.get_lesson_content(
+            module_id, next_lesson_number, db
+        )
+        if lesson_content:
+            # Auto-create lesson in DB
+            from app.crud.lesson import create_lesson
+            lesson_id = f"{module_id}_Lesson_{next_lesson_number:02d}"
+            lesson_data_db = {
+                "id": lesson_id,
+                "module_id": module_id,
+                "lesson_number": next_lesson_number,
+                "title": f"Урок {next_lesson_number}",
+                "order_index": next_lesson_number,
+                "is_active": True
+            }
+            lesson = await create_lesson(db, lesson_data_db)
+        else:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=f"Lesson {next_lesson_number} not found"
+            )
+    else:
+        # Get lesson content
+        lesson_content = await content_service.get_lesson_content(
+            module_id, next_lesson_number, db
+        )
     
     if not lesson_content:
         raise HTTPException(
@@ -194,6 +253,7 @@ async def get_next_lesson(
     
     return LessonContentResponse(
         status="success",
+        lesson_id=lesson.id,
         lesson_number=next_lesson_number,
         total_lessons=progress.total_lessons,
         content=lesson_content.get("content"),

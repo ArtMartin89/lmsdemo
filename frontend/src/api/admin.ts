@@ -67,60 +67,60 @@ export interface LessonContent {
 export const adminApi = {
   // Courses
   listCourses: async (): Promise<Course[]> => {
-    const response = await axios.get('/api/v1/admin/courses');
+    const response = await axios.get('/admin/courses');
     return response.data;
   },
 
   getCourse: async (courseId: string): Promise<CourseWithModules> => {
-    const response = await axios.get(`/api/v1/admin/courses/${courseId}`);
+    const response = await axios.get(`/admin/courses/${courseId}`);
     return response.data;
   },
 
   createCourse: async (courseData: CourseCreate): Promise<Course> => {
-    const response = await axios.post('/api/v1/admin/courses', courseData);
+    const response = await axios.post('/admin/courses', courseData);
     return response.data;
   },
 
   updateCourse: async (courseId: string, courseData: CourseUpdate): Promise<Course> => {
-    const response = await axios.put(`/api/v1/admin/courses/${courseId}`, courseData);
+    const response = await axios.put(`/admin/courses/${courseId}`, courseData);
     return response.data;
   },
 
   deleteCourse: async (courseId: string): Promise<void> => {
-    await axios.delete(`/api/v1/admin/courses/${courseId}`);
+    await axios.delete(`/admin/courses/${courseId}`);
   },
 
   // Modules
   listModules: async (courseId?: string) => {
     const url = courseId 
-      ? `/api/v1/admin/modules?course_id=${courseId}`
-      : '/api/v1/admin/modules';
+      ? `/admin/modules?course_id=${courseId}`
+      : '/admin/modules';
     const response = await axios.get(url);
     return response.data;
   },
 
   createModule: async (moduleData: ModuleCreate) => {
-    const response = await axios.post('/api/v1/admin/modules', moduleData);
+    const response = await axios.post('/admin/modules', moduleData);
     return response.data;
   },
 
   getModule: async (moduleId: string) => {
-    const response = await axios.get(`/api/v1/admin/modules/${moduleId}`);
+    const response = await axios.get(`/admin/modules/${moduleId}`);
     return response.data;
   },
 
   updateModule: async (moduleId: string, moduleData: ModuleUpdate) => {
-    const response = await axios.put(`/api/v1/admin/modules/${moduleId}`, moduleData);
+    const response = await axios.put(`/admin/modules/${moduleId}`, moduleData);
     return response.data;
   },
 
   deleteModule: async (moduleId: string) => {
-    await axios.delete(`/api/v1/admin/modules/${moduleId}`);
+    await axios.delete(`/admin/modules/${moduleId}`);
   },
 
   // Lessons
   getLesson: async (moduleId: string, lessonNumber: number): Promise<LessonContent> => {
-    const response = await axios.get(`/api/v1/admin/modules/${moduleId}/lessons/${lessonNumber}`);
+    const response = await axios.get(`/admin/modules/${moduleId}/lessons/${lessonNumber}`);
     return response.data;
   },
 
@@ -128,7 +128,7 @@ export const adminApi = {
     const formData = new FormData();
     formData.append('content', content);
     const response = await axios.post(
-      `/api/v1/admin/modules/${moduleId}/lessons/${lessonNumber}`,
+      `/admin/modules/${moduleId}/lessons/${lessonNumber}/content`,
       formData,
       {
         headers: {
@@ -143,12 +143,14 @@ export const adminApi = {
   uploadFile: async (
     moduleId: string,
     lessonNumber: number,
+    fileType: string,
     file: File
   ) => {
     const formData = new FormData();
     formData.append('file', file);
+    formData.append('file_type', fileType);
     const response = await axios.post(
-      `/api/v1/admin/modules/${moduleId}/lessons/${lessonNumber}/files`,
+      `/admin/modules/${moduleId}/lessons/${lessonNumber}/files`,
       formData,
       {
         headers: {
@@ -159,22 +161,32 @@ export const adminApi = {
     return response.data;
   },
 
-  getFileUrl: (moduleId: string, lessonNumber: number, filename: string) => {
-    return `/api/v1/admin/files/${moduleId}/${lessonNumber}/${filename}`;
+  listLessonFiles: async (moduleId: string, lessonNumber: number) => {
+    const response = await axios.get(`/admin/modules/${moduleId}/lessons/${lessonNumber}/files`);
+    return response.data;
   },
 
-  deleteFile: async (moduleId: string, lessonNumber: number, filename: string) => {
-    await axios.delete(`/api/v1/admin/files/${moduleId}/${lessonNumber}/${filename}`);
+  getFileUrl: (moduleId: string, lessonNumber: number, fileType: string, filename: string) => {
+    return `/api/v1/modules/${moduleId}/lessons/${lessonNumber}/files/${fileType}/${filename}`;
+  },
+
+  deleteFile: async (moduleId: string, lessonNumber: number, fileType: string, filename: string) => {
+    await axios.delete(`/admin/modules/${moduleId}/lessons/${lessonNumber}/files/${fileType}/${filename}`);
   },
 
   // Tests
   getTest: async (moduleId: string) => {
-    const response = await axios.get(`/api/v1/admin/modules/${moduleId}/test`);
+    const response = await axios.get(`/admin/modules/${moduleId}/test`);
     return response.data;
   },
 
-  saveTest: async (moduleId: string, testData: any) => {
-    const response = await axios.post(`/api/v1/admin/modules/${moduleId}/test`, testData);
+  saveTestQuestions: async (moduleId: string, testData: any) => {
+    const response = await axios.post(`/admin/modules/${moduleId}/test/questions`, testData);
+    return response.data;
+  },
+
+  saveTestSettings: async (moduleId: string, settingsData: any) => {
+    const response = await axios.put(`/admin/modules/${moduleId}/test/settings`, settingsData);
     return response.data;
   },
 };
