@@ -40,7 +40,7 @@ async def get_test_questions(
             detail="Test not available. Complete all lessons first."
         )
     
-    test_questions = await content_service.get_test_questions(module_id)
+    test_questions = await content_service.get_test_questions(module_id, db)
     
     if not test_questions:
         raise HTTPException(
@@ -73,23 +73,25 @@ async def submit_test(
             detail="Test not available. Complete all lessons first."
         )
     
-    # Get correct answers
-    correct_answers_data = await content_service.get_correct_answers(module_id)
+    # Get test questions (which contain correct answers)
+    test_questions_data = await content_service.get_test_questions(module_id, db)
     
-    if not correct_answers_data:
+    if not test_questions_data:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Test answers not found"
+            detail="Test questions not found"
         )
     
     # Format answers for grading
     user_answers = [{"question_id": ans.question_id, "answer": ans.answer} for ans in submission.answers]
-    correct_answers = correct_answers_data.get("answers", [])
+    
+    # Extract questions with correct answers
+    questions = test_questions_data.get("questions", [])
     
     # Grade test
     result = grading_service.grade_test(
         user_answers,
-        correct_answers
+        questions
     )
     
     # Calculate attempt number

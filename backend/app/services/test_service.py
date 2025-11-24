@@ -7,29 +7,37 @@ class TestGradingService:
     def grade_test(
         self,
         user_answers: List[Dict[str, Any]],
-        correct_answers: List[Dict[str, Any]],
+        questions: List[Dict[str, Any]],
         passing_threshold: float = 0.7
     ) -> TestResult:
         """Grade test submission and return detailed results"""
         score = 0
-        max_score = len(correct_answers)
+        total_points = 0
         detailed_results = []
         
-        # Create answer lookup dict
-        correct_lookup = {
-            ans["question_id"]: ans["correct_answer"] 
-            for ans in correct_answers
+        # Create question lookup dict
+        question_lookup = {
+            q["id"]: q 
+            for q in questions
         }
         
-        for user_answer in user_answers:
-            question_id = user_answer["question_id"]
-            user_response = user_answer["answer"]
-            correct_response = correct_lookup.get(question_id)
+        # Create user answer lookup
+        user_answer_lookup = {
+            ans["question_id"]: ans["answer"]
+            for ans in user_answers
+        }
+        
+        for question in questions:
+            question_id = question["id"]
+            user_response = user_answer_lookup.get(question_id)
+            correct_response = question.get("correct_answer")
+            points = question.get("points", 1)
+            total_points += points
             
             is_correct = self._compare_answers(user_response, correct_response)
             
             if is_correct:
-                score += 1
+                score += points
             
             detailed_results.append(TestResultDetail(
                 question_id=question_id,
@@ -38,8 +46,9 @@ class TestGradingService:
                 correct_answer=correct_response if not is_correct else None
             ))
         
-        percentage = int((score / max_score) * 100)
-        passed = (score / max_score) >= passing_threshold
+        max_score = total_points
+        percentage = int((score / max_score) * 100) if max_score > 0 else 0
+        passed = (score / max_score) >= passing_threshold if max_score > 0 else False
         
         return TestResult(
             score=score,

@@ -17,6 +17,7 @@ from app.crud.module import (
 )
 from app.schemas.course import CourseCreate, CourseUpdate, CourseResponse, CourseWithModules
 from app.schemas.module import ModuleCreate, ModuleUpdate, ModuleResponse
+from app.schemas.lesson import LessonResponse
 from app.core.storage import StorageService
 from app.dependencies import get_storage_service
 from uuid import UUID
@@ -189,20 +190,58 @@ async def admin_delete_module(
     return None
 
 
-# Lesson Content Management
+# Lesson Management
+@router.get("/modules/{module_id}/lessons", response_model=List[dict])
+async def admin_list_lessons(
+    module_id: str,
+    db: AsyncSession = Depends(get_db),
+    admin_user: User = Depends(get_current_admin_user)
+):
+    """List all lessons for a module (admin only)"""
+    from app.crud.lesson import get_all_lessons
+    from app.schemas.lesson import LessonResponse
+    
+    lessons = await get_all_lessons(db, module_id=module_id, include_inactive=True)
+    return [LessonResponse.model_validate(lesson).dict() for lesson in lessons]
+
+
 @router.get("/modules/{module_id}/lessons/{lesson_number}")
 async def admin_get_lesson(
     module_id: str,
     lesson_number: int,
+    db: AsyncSession = Depends(get_db),
     storage_service: StorageService = Depends(get_storage_service),
     admin_user: User = Depends(get_current_admin_user)
 ):
-    """Get lesson content for editing (admin only)"""
-    content = await storage_service.get_lesson_content(module_id, lesson_number)
+    """Get lesson for editing (admin only)"""
+    from app.crud.lesson import get_lesson_by_module_and_number
+    from app.crud.module import get_module
+    
+    # Get lesson from DB
+    lesson = await get_lesson_by_module_and_number(db, module_id, lesson_number)
+    if not lesson:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Lesson not found"
+        )
+    
+    # Get module to get course_id
+    module = await get_module(db, module_id)
+    if not module:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Module not found"
+        )
+    
+    # Get lesson content
+    content = await storage_service.get_lesson_content(
+        module.course_id, module_id, lesson.id
+    )
     
     # If lesson doesn't exist, return empty content
     if not content:
         content = {
+            "lesson_id": lesson.id,
             "module_id": module_id,
             "lesson_number": lesson_number,
             "content": "",
@@ -210,48 +249,152 @@ async def admin_get_lesson(
         }
     
     # Get list of files
-    files = await storage_service.list_lesson_files(module_id, lesson_number)
+    files = await storage_service.list_lesson_files(
+        module.course_id, module_id, lesson.id
+    )
     content["files"] = files
+    content["lesson"] = LessonResponse.model_validate(lesson).dict()
     
     return content
 
 
-@router.post("/modules/{module_id}/lessons/{lesson_number}")
-async def admin_save_lesson(
+@router.post("/modules/{module_id}/lessons", response_model=dict, status_code=status.HTTP_201_CREATED)
+async def admin_create_lesson(
     module_id: str,
-    lesson_number: int,
-    content: str = Form(...),
-    storage_service: StorageService = Depends(get_storage_service),
+    lesson_data: dict,
+    db: AsyncSession = Depends(get_db),
     admin_user: User = Depends(get_current_admin_user)
 ):
-    """Save lesson content (admin only)"""
-    success = await storage_service.save_lesson_content(
-        module_id, lesson_number, content
-    )
+    """Create a new lesson (admin only)"""
+    from app.crud.lesson import create_lesson, get_lesson
+    from app.crud.module import get_module
+    from app.schemas.lesson import LessonCreate
+    
+    # Check if module exists
+    module = await get_module(db, module_id)
+    if not module:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Module not found"
+        )
+    
+    # Check if lesson already exists
+    existing = await get_lesson(db, lesson_data.get("id"))
+    if existing:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Lesson with this ID already exists"
+        )
+    
+    # Set module_id
+    lesson_data["module_id"] = module_id
+    
+    lesson = await create_lesson(db, lesson_data)
+    return LessonResponse.model_validate(lesson).dict()
+
+
+@router.put("/modules/{module_id}/lessons/{lesson_number}", response_model=dict)
+async def admin_update_lesson(
+    module_id: str,
+    lesson_number: int,
+    lesson_data: dict,
+    db: AsyncSession = Depends(get_db),
+    admin_user: User = Depends(get_current_admin_user)
+):
+    """Update lesson (admin only)"""
+    from app.crud.lesson import get_lesson_by_module_and_number, update_lesson
+    from app.schemas.lesson import LessonUpdate, LessonResponse
+    
+    lesson = await get_lesson_by_module_and_number(db, module_id, lesson_number)
+    if not lesson:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Lesson not found"
+        )
+    
+    updated_lesson = await update_lesson(db, lesson.id, lesson_data)
+    if not updated_lesson:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Failed to update lesson"
+        )
+    
+    return LessonResponse.model_validate(updated_lesson).dict()
+
+
+@router.delete("/modules/{module_id}/lessons/{lesson_number}", status_code=status.HTTP_204_NO_CONTENT)
+async def admin_delete_lesson(
+    module_id: str,
+    lesson_number: int,
+    db: AsyncSession = Depends(get_db),
+    admin_user: User = Depends(get_current_admin_user)
+):
+    """Delete lesson (admin only)"""
+    from app.crud.lesson import get_lesson_by_module_and_number, delete_lesson
+    
+    lesson = await get_lesson_by_module_and_number(db, module_id, lesson_number)
+    if not lesson:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Lesson not found"
+        )
+    
+    success = await delete_lesson(db, lesson.id)
     if not success:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Failed to save lesson content"
+            detail="Failed to delete lesson"
         )
-    return {"status": "success", "message": "Lesson content saved"}
+    return None
 
 
 @router.post("/modules/{module_id}/lessons/{lesson_number}/files")
 async def admin_upload_file(
     module_id: str,
     lesson_number: int,
+    file_type: str = Form(...),
     file: UploadFile = File(...),
+    db: AsyncSession = Depends(get_db),
     storage_service: StorageService = Depends(get_storage_service),
     admin_user: User = Depends(get_current_admin_user)
 ):
     """Upload a file for a lesson (admin only)"""
+    from app.crud.lesson import get_lesson_by_module_and_number
+    from app.crud.module import get_module
+    
+    # Validate file type
+    valid_types = ["audio", "video", "images", "attachments"]
+    if file_type not in valid_types:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Invalid file type. Must be one of: {valid_types}"
+        )
+    
+    # Get lesson
+    lesson = await get_lesson_by_module_and_number(db, module_id, lesson_number)
+    if not lesson:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Lesson not found"
+        )
+    
+    # Get module to get course_id
+    module = await get_module(db, module_id)
+    if not module:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Module not found"
+        )
+    
     # Read file content
     file_content = await file.read()
     
     # Save file
     file_path = await storage_service.save_file(
+        module.course_id,
         module_id,
-        lesson_number,
+        lesson.id,
+        file_type,
         file_content,
         file.filename,
         file.content_type or "application/octet-stream"
@@ -271,54 +414,74 @@ async def admin_upload_file(
     }
 
 
-@router.get("/files/{module_id}/{lesson_number}/{filename}")
-async def admin_get_file(
+@router.get("/modules/{module_id}/lessons/{lesson_number}/files")
+async def admin_list_lesson_files(
     module_id: str,
     lesson_number: int,
-    filename: str,
+    db: AsyncSession = Depends(get_db),
     storage_service: StorageService = Depends(get_storage_service),
     admin_user: User = Depends(get_current_admin_user)
 ):
-    """Get file content (admin only)"""
-    file_content = await storage_service.get_file(module_id, lesson_number, filename)
-    if not file_content:
+    """List all files for a lesson (admin only)"""
+    from app.crud.lesson import get_lesson_by_module_and_number
+    from app.crud.module import get_module
+    
+    # Get lesson
+    lesson = await get_lesson_by_module_and_number(db, module_id, lesson_number)
+    if not lesson:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
-            detail="File not found"
+            detail="Lesson not found"
         )
     
-    # Determine content type from filename
-    content_type = "application/octet-stream"
-    if filename.endswith((".mp3", ".wav", ".ogg")):
-        content_type = "audio/mpeg" if filename.endswith(".mp3") else "audio/wav"
-    elif filename.endswith((".mp4", ".webm")):
-        content_type = "video/mp4" if filename.endswith(".mp4") else "video/webm"
-    elif filename.endswith((".jpg", ".jpeg")):
-        content_type = "image/jpeg"
-    elif filename.endswith(".png"):
-        content_type = "image/png"
-    elif filename.endswith(".gif"):
-        content_type = "image/gif"
+    # Get module to get course_id
+    module = await get_module(db, module_id)
+    if not module:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Module not found"
+        )
     
-    return Response(
-        content=file_content,
-        media_type=content_type,
-        headers={
-            "Content-Disposition": f'inline; filename="{filename}"'
-        }
+    files = await storage_service.list_lesson_files(
+        module.course_id, module_id, lesson.id
     )
+    
+    return files
 
 
-@router.delete("/files/{module_id}/{lesson_number}/{filename}")
+@router.delete("/modules/{module_id}/lessons/{lesson_number}/files/{file_type}/{filename}")
 async def admin_delete_file(
     module_id: str,
     lesson_number: int,
+    file_type: str,
     filename: str,
+    db: AsyncSession = Depends(get_db),
     storage_service: StorageService = Depends(get_storage_service),
     admin_user: User = Depends(get_current_admin_user)
 ):
-    """Delete a file (admin only)"""
-    success = await storage_service.delete_file(module_id, lesson_number, filename)
+    """Delete a file from lesson (admin only)"""
+    from app.crud.lesson import get_lesson_by_module_and_number
+    from app.crud.module import get_module
+    
+    # Get lesson
+    lesson = await get_lesson_by_module_and_number(db, module_id, lesson_number)
+    if not lesson:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Lesson not found"
+        )
+    
+    # Get module to get course_id
+    module = await get_module(db, module_id)
+    if not module:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Module not found"
+        )
+    
+    success = await storage_service.delete_file(
+        module.course_id, module_id, lesson.id, file_type, filename
+    )
     if not success:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
@@ -330,41 +493,147 @@ async def admin_delete_file(
     }
 
 
+@router.post("/modules/{module_id}/lessons/{lesson_number}/content")
+async def admin_save_lesson_content(
+    module_id: str,
+    lesson_number: int,
+    content: str = Form(...),
+    db: AsyncSession = Depends(get_db),
+    storage_service: StorageService = Depends(get_storage_service),
+    admin_user: User = Depends(get_current_admin_user)
+):
+    """Save lesson content (admin only)"""
+    from app.crud.lesson import get_lesson_by_module_and_number
+    from app.crud.module import get_module
+    
+    # Get lesson
+    lesson = await get_lesson_by_module_and_number(db, module_id, lesson_number)
+    if not lesson:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Lesson not found"
+        )
+    
+    # Get module to get course_id
+    module = await get_module(db, module_id)
+    if not module:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Module not found"
+        )
+    
+    success = await storage_service.save_lesson_content(
+        module.course_id, module_id, lesson.id, content
+    )
+    if not success:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Failed to save lesson content"
+        )
+    return {"status": "success", "message": "Lesson content saved"}
+
+
 # Test Management
 @router.get("/modules/{module_id}/test")
 async def admin_get_test(
     module_id: str,
+    db: AsyncSession = Depends(get_db),
     storage_service: StorageService = Depends(get_storage_service),
     admin_user: User = Depends(get_current_admin_user)
 ):
-    """Get test questions for editing (admin only)"""
-    test_data = await storage_service.get_test_questions(module_id)
+    """Get test questions and settings for editing (admin only)"""
+    from app.crud.module import get_module
+    
+    # Get module to get course_id
+    module = await get_module(db, module_id)
+    if not module:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Module not found"
+        )
+    
+    # Get test questions
+    questions = await storage_service.get_test_questions(module.course_id, module_id)
+    
+    # Get test settings
+    settings = await storage_service.get_test_settings(module.course_id, module_id)
     
     # If test doesn't exist, return empty structure
-    if not test_data:
-        test_data = {
+    if not questions:
+        questions = {
             "module_id": module_id,
-            "passing_threshold": 0.7,
-            "time_limit_minutes": 30,
             "questions": []
         }
     
-    return test_data
+    if not settings:
+        settings = {
+            "module_id": module_id,
+            "passing_threshold": 0.7,
+            "time_limit_minutes": 30,
+            "max_attempts": 3,
+            "shuffle_questions": True,
+            "show_results_immediately": False,
+            "allow_review": True
+        }
+    
+    return {
+        "questions": questions,
+        "settings": settings
+    }
 
 
-@router.post("/modules/{module_id}/test")
-async def admin_save_test(
+@router.post("/modules/{module_id}/test/questions")
+async def admin_save_test_questions(
     module_id: str,
     test_data: dict,
+    db: AsyncSession = Depends(get_db),
     storage_service: StorageService = Depends(get_storage_service),
     admin_user: User = Depends(get_current_admin_user)
 ):
     """Save test questions (admin only)"""
-    success = await storage_service.save_test_questions(module_id, test_data)
+    from app.crud.module import get_module
+    
+    # Get module to get course_id
+    module = await get_module(db, module_id)
+    if not module:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Module not found"
+        )
+    
+    success = await storage_service.save_test_questions(module.course_id, module_id, test_data)
     if not success:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Failed to save test"
+            detail="Failed to save test questions"
         )
-    return {"status": "success", "message": "Test saved successfully"}
+    return {"status": "success", "message": "Test questions saved successfully"}
+
+
+@router.put("/modules/{module_id}/test/settings")
+async def admin_update_test_settings(
+    module_id: str,
+    settings_data: dict,
+    db: AsyncSession = Depends(get_db),
+    storage_service: StorageService = Depends(get_storage_service),
+    admin_user: User = Depends(get_current_admin_user)
+):
+    """Update test settings (admin only)"""
+    from app.crud.module import get_module
+    
+    # Get module to get course_id
+    module = await get_module(db, module_id)
+    if not module:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Module not found"
+        )
+    
+    success = await storage_service.save_test_settings(module.course_id, module_id, settings_data)
+    if not success:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Failed to save test settings"
+        )
+    return {"status": "success", "message": "Test settings saved successfully"}
 
