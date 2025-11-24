@@ -3,7 +3,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from contextlib import asynccontextmanager
 import redis.asyncio as redis
 
-from app.api.v1 import auth, modules, lessons, tests, progress
+from app.api.v1 import auth, modules, lessons, tests, progress, admin
 from app.config import settings
 from app.db.session import engine
 from app.db.base import Base
@@ -63,6 +63,7 @@ app.include_router(modules.router, prefix="/api/v1/modules", tags=["modules"])
 app.include_router(lessons.router, prefix="/api/v1", tags=["lessons"])
 app.include_router(tests.router, prefix="/api/v1", tags=["tests"])
 app.include_router(progress.router, prefix="/api/v1/progress", tags=["progress"])
+app.include_router(admin.router, prefix="/api/v1/admin", tags=["admin"])
 
 @app.get("/health")
 async def health_check():

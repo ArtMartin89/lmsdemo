@@ -6,6 +6,9 @@ import LessonView from './pages/LessonView'
 import TestView from './pages/TestView'
 import TestResult from './pages/TestResult'
 import PrivateRoute from './components/common/PrivateRoute'
+import AdminRoute from './components/common/AdminRoute'
+import AdminModules from './pages/admin/AdminModules'
+import AdminLessons from './pages/admin/AdminLessons'
 
 function App() {
   return (
@@ -43,6 +46,22 @@ function App() {
               <PrivateRoute>
                 <TestResult />
               </PrivateRoute>
+            }
+          />
+          <Route
+            path="/admin/modules"
+            element={
+              <AdminRoute>
+                <AdminModules />
+              </AdminRoute>
+            }
+          />
+          <Route
+            path="/admin/modules/:moduleId/lessons"
+            element={
+              <AdminRoute>
+                <AdminLessons />
+              </AdminRoute>
             }
           />
           <Route path="/" element={<Navigate to="/dashboard" replace />} />

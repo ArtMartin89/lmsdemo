@@ -79,3 +79,16 @@ async def get_current_user(
     
     return user
 
+
+async def get_current_admin_user(
+    current_user = Depends(get_current_user)
+):
+    """Dependency to check if user is admin"""
+    from app.models.user import User
+    if not current_user.is_superuser:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Admin access required"
+        )
+    return current_user
+

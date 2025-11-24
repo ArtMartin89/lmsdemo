@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from 'react'
+import { Link } from 'react-router-dom'
 import { useAuth } from '../contexts/AuthContext'
 import { getModules } from '../api/modules'
 import { getProgress } from '../api/progress'
@@ -20,8 +21,10 @@ const Dashboard: React.FC = () => {
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
+    console.log('Dashboard - Current user:', user) // Debug
+    console.log('Dashboard - is_superuser:', user?.is_superuser) // Debug
     loadData()
-  }, [])
+  }, [user])
 
   const loadData = async () => {
     try {
@@ -60,7 +63,19 @@ const Dashboard: React.FC = () => {
         <div className="max-w-7xl mx-auto px-4 py-4 flex justify-between items-center">
           <h1 className="text-2xl font-bold">LMS Platform</h1>
           <div className="flex items-center gap-4">
-            <span className="text-gray-700">Привет, {user?.username}!</span>
+            {/* Always show debug info for now */}
+            <span className="text-xs text-gray-500">
+              is_superuser: {String(user?.is_superuser ?? 'undefined')}
+            </span>
+            {user?.is_superuser === true && (
+              <Link to="/admin/modules">
+                <Button variant="secondary">Админ-панель</Button>
+              </Link>
+            )}
+            <span className="text-gray-700">
+              Привет, {user?.username}!
+              {user?.is_superuser === true && <span className="ml-2 text-xs text-blue-600">(Админ)</span>}
+            </span>
             <Button variant="secondary" onClick={logout}>
               Выйти
             </Button>

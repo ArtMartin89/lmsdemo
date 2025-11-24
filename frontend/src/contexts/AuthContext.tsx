@@ -6,6 +6,7 @@ interface User {
   username: string
   email: string
   is_active: boolean
+  is_superuser?: boolean
 }
 
 interface AuthContextType {
@@ -34,8 +35,20 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const loadUser = async () => {
     try {
       const userData = await getCurrentUser()
-      setUser(userData)
+      console.log('=== AUTH DEBUG ===')
+      console.log('Loaded user data:', JSON.stringify(userData, null, 2))
+      console.log('is_superuser type:', typeof userData.is_superuser)
+      console.log('is_superuser value:', userData.is_superuser)
+      console.log('==================')
+      // Ensure is_superuser is a boolean
+      const userWithSuperuser = {
+        ...userData,
+        is_superuser: Boolean(userData.is_superuser)
+      }
+      console.log('Final user object:', JSON.stringify(userWithSuperuser, null, 2))
+      setUser(userWithSuperuser)
     } catch (error) {
+      console.error('Failed to load user:', error)
       localStorage.removeItem('access_token')
     } finally {
       setLoading(false)
