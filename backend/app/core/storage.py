@@ -249,6 +249,28 @@ class StorageService:
                     files.append(filename)
             return files
     
+    async def save_test_questions(
+        self,
+        module_id: str,
+        test_data: Dict[str, Any]
+    ) -> bool:
+        """Save test questions to storage"""
+        if settings.USE_LOCAL_STORAGE:
+            file_path = self._ensure_directory("tests", module_id, "test_questions.json")
+            if file_path:
+                with open(file_path, "w", encoding="utf-8") as f:
+                    json.dump(test_data, f, ensure_ascii=False, indent=2)
+                return True
+            return False
+        else:
+            blob_path = f"tests/{module_id}/test_questions.json"
+            blob = self.bucket.blob(blob_path)
+            blob.upload_from_string(
+                json.dumps(test_data, ensure_ascii=False, indent=2),
+                content_type="application/json"
+            )
+            return True
+    
     async def delete_file(
         self,
         module_id: str,

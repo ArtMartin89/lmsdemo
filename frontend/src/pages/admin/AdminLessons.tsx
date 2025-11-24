@@ -195,7 +195,7 @@ const LessonEditor: React.FC<LessonEditorProps> = ({
         />
       </div>
 
-      <div className="border-t pt-6">
+      <div className="border-t pt-6 mb-6">
         <div className="flex justify-between items-center mb-4">
           <h3 className="text-lg font-semibold">Файлы урока</h3>
           <label className="cursor-pointer">
@@ -255,6 +255,18 @@ const LessonEditor: React.FC<LessonEditorProps> = ({
             })}
           </div>
         )}
+      </div>
+
+      <div className="border-t pt-6">
+        <div className="flex justify-between items-center mb-4">
+          <h3 className="text-lg font-semibold">Тест модуля</h3>
+          <Button
+            onClick={() => navigate(`/admin/modules/${moduleId}/test`)}
+            variant="secondary"
+          >
+            Редактировать тест
+          </Button>
+        </div>
       </div>
     </div>
   );

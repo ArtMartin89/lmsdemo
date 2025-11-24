@@ -7,8 +7,11 @@ import TestView from './pages/TestView'
 import TestResult from './pages/TestResult'
 import PrivateRoute from './components/common/PrivateRoute'
 import AdminRoute from './components/common/AdminRoute'
+import AdminCourses from './pages/admin/AdminCourses'
+import AdminCourseModules from './pages/admin/AdminCourseModules'
 import AdminModules from './pages/admin/AdminModules'
 import AdminLessons from './pages/admin/AdminLessons'
+import AdminTestEditor from './pages/admin/AdminTestEditor'
 
 function App() {
   return (
@@ -49,6 +52,22 @@ function App() {
             }
           />
           <Route
+            path="/admin/courses"
+            element={
+              <AdminRoute>
+                <AdminCourses />
+              </AdminRoute>
+            }
+          />
+          <Route
+            path="/admin/courses/:courseId/modules"
+            element={
+              <AdminRoute>
+                <AdminCourseModules />
+              </AdminRoute>
+            }
+          />
+          <Route
             path="/admin/modules"
             element={
               <AdminRoute>
@@ -61,6 +80,14 @@ function App() {
             element={
               <AdminRoute>
                 <AdminLessons />
+              </AdminRoute>
+            }
+          />
+          <Route
+            path="/admin/modules/:moduleId/test"
+            element={
+              <AdminRoute>
+                <AdminTestEditor />
               </AdminRoute>
             }
           />

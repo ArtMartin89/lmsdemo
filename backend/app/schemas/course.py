@@ -1,37 +1,30 @@
 from pydantic import BaseModel
-from typing import Optional
+from typing import Optional, List
 from datetime import datetime
 from uuid import UUID
 
+from app.schemas.module import ModuleResponse
 
-class ModuleBase(BaseModel):
-    id: str
+
+class CourseBase(BaseModel):
     title: str
     description: Optional[str] = None
-    total_lessons: int
-    order_index: int
+    order_index: int = 0
 
 
-class ModuleCreate(BaseModel):
-    id: str
-    course_id: UUID
-    title: str
-    description: Optional[str] = None
-    total_lessons: int = 3
-    order_index: int
+class CourseCreate(CourseBase):
     is_active: bool = True
 
 
-class ModuleUpdate(BaseModel):
+class CourseUpdate(BaseModel):
     title: Optional[str] = None
     description: Optional[str] = None
-    total_lessons: Optional[int] = None
     order_index: Optional[int] = None
     is_active: Optional[bool] = None
 
 
-class ModuleResponse(ModuleBase):
-    course_id: UUID
+class CourseResponse(CourseBase):
+    id: UUID
     is_active: bool
     created_at: datetime
     updated_at: datetime
@@ -39,4 +32,7 @@ class ModuleResponse(ModuleBase):
     class Config:
         from_attributes = True
 
+
+class CourseWithModules(CourseResponse):
+    modules: List[ModuleResponse] = []
 

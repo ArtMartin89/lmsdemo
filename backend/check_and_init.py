@@ -8,9 +8,11 @@ from sqlalchemy.orm import sessionmaker
 from sqlalchemy import select, text
 from app.config import settings
 from app.db.base import Base
+from app.models.course import Course
 from app.models.module import Module
 from app.models.user import User
 from app.core.security import get_password_hash, verify_password
+import uuid
 
 
 async def check_and_init():
@@ -89,35 +91,137 @@ async def check_and_init():
                     await session.commit()
                     print("✓ Admin user password reset: admin / admin")
             
-            # Create test modules
-            modules_data = [
+            # Create test courses
+            courses_data = [
                 {
-                    "id": "Module_01",
-                    "title": "Введение в Python",
-                    "description": "Основы языка программирования Python",
-                    "total_lessons": 3,
-                    "order_index": 1
+                    "id": uuid.uuid4(),
+                    "title": "Информация о компании",
+                    "description": "Курс о компании, её истории и ценностях",
+                    "order_index": 1,
+                    "is_active": True
                 },
                 {
-                    "id": "Module_02",
-                    "title": "Продвинутый Python",
-                    "description": "Продвинутые концепции Python",
-                    "total_lessons": 3,
-                    "order_index": 2
+                    "id": uuid.uuid4(),
+                    "title": "Основы ИИ",
+                    "description": "Курс по основам искусственного интеллекта",
+                    "order_index": 2,
+                    "is_active": True
                 }
             ]
             
-            for module_data in modules_data:
+            course1_id = None
+            course2_id = None
+            
+            for course_data in courses_data:
                 existing = await session.execute(
-                    select(Module).where(Module.id == module_data["id"])
+                    select(Course).where(Course.title == course_data["title"])
                 )
-                if not existing.scalar_one_or_none():
-                    module = Module(**module_data)
-                    session.add(module)
+                course_obj = existing.scalar_one_or_none()
+                
+                if not course_obj:
+                    course = Course(**course_data)
+                    session.add(course)
                     await session.commit()
-                    print(f"✓ Module created: {module_data['id']}")
+                    await session.refresh(course)
+                    print(f"✓ Course created: {course_data['title']}")
+                    if course_data["title"] == "Информация о компании":
+                        course1_id = course.id
+                    else:
+                        course2_id = course.id
                 else:
-                    print(f"✓ Module exists: {module_data['id']}")
+                    print(f"✓ Course exists: {course_data['title']}")
+                    if course_data["title"] == "Информация о компании":
+                        course1_id = course_obj.id
+                    else:
+                        course2_id = course_obj.id
+            
+            # Create modules for Course 1: "Информация о компании"
+            if course1_id:
+                modules_course1 = [
+                    {
+                        "id": "Company_Module_01",
+                        "course_id": course1_id,
+                        "title": "Основы",
+                        "description": "Основная информация о компании",
+                        "total_lessons": 3,
+                        "order_index": 1,
+                        "is_active": True
+                    },
+                    {
+                        "id": "Company_Module_02",
+                        "course_id": course1_id,
+                        "title": "Подробнее",
+                        "description": "Подробная информация о компании",
+                        "total_lessons": 3,
+                        "order_index": 2,
+                        "is_active": True
+                    },
+                    {
+                        "id": "Company_Module_03",
+                        "course_id": course1_id,
+                        "title": "Третий",
+                        "description": "Дополнительная информация",
+                        "total_lessons": 3,
+                        "order_index": 3,
+                        "is_active": True
+                    }
+                ]
+                
+                for module_data in modules_course1:
+                    existing = await session.execute(
+                        select(Module).where(Module.id == module_data["id"])
+                    )
+                    if not existing.scalar_one_or_none():
+                        module = Module(**module_data)
+                        session.add(module)
+                        await session.commit()
+                        print(f"✓ Module created: {module_data['id']}")
+                    else:
+                        print(f"✓ Module exists: {module_data['id']}")
+            
+            # Create modules for Course 2: "Основы ИИ"
+            if course2_id:
+                modules_course2 = [
+                    {
+                        "id": "AI_Module_01",
+                        "course_id": course2_id,
+                        "title": "Введение в ИИ",
+                        "description": "Основные концепции искусственного интеллекта",
+                        "total_lessons": 3,
+                        "order_index": 1,
+                        "is_active": True
+                    },
+                    {
+                        "id": "AI_Module_02",
+                        "course_id": course2_id,
+                        "title": "Машинное обучение",
+                        "description": "Основы машинного обучения",
+                        "total_lessons": 3,
+                        "order_index": 2,
+                        "is_active": True
+                    },
+                    {
+                        "id": "AI_Module_03",
+                        "course_id": course2_id,
+                        "title": "Нейронные сети",
+                        "description": "Введение в нейронные сети",
+                        "total_lessons": 3,
+                        "order_index": 3,
+                        "is_active": True
+                    }
+                ]
+                
+                for module_data in modules_course2:
+                    existing = await session.execute(
+                        select(Module).where(Module.id == module_data["id"])
+                    )
+                    if not existing.scalar_one_or_none():
+                        module = Module(**module_data)
+                        session.add(module)
+                        await session.commit()
+                        print(f"✓ Module created: {module_data['id']}")
+                    else:
+                        print(f"✓ Module exists: {module_data['id']}")
         
         await engine.dispose()
         print("\n✅ Database initialized successfully!")

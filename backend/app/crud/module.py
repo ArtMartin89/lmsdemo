@@ -1,6 +1,7 @@
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 from typing import List, Optional
+from uuid import UUID
 
 from app.models.module import Module
 
@@ -10,8 +11,11 @@ async def get_module(db: AsyncSession, module_id: str) -> Optional[Module]:
     return result.scalar_one_or_none()
 
 
-async def get_all_modules(db: AsyncSession, include_inactive: bool = False) -> List[Module]:
-    query = select(Module).order_by(Module.order_index)
+async def get_all_modules(db: AsyncSession, include_inactive: bool = False, course_id: Optional[UUID] = None) -> List[Module]:
+    query = select(Module)
+    if course_id:
+        query = query.where(Module.course_id == course_id)
+    query = query.order_by(Module.order_index)
     if not include_inactive:
         query = query.where(Module.is_active == True)
     result = await db.execute(query)

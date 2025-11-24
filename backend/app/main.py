@@ -3,7 +3,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from contextlib import asynccontextmanager
 import redis.asyncio as redis
 
-from app.api.v1 import auth, modules, lessons, tests, progress, admin
+from app.api.v1 import auth, courses, modules, lessons, tests, progress, admin
 from app.config import settings
 from app.db.session import engine
 from app.db.base import Base
@@ -59,6 +59,7 @@ app.add_middleware(
 
 # Include routers
 app.include_router(auth.router, prefix="/api/v1/auth", tags=["auth"])
+app.include_router(courses.router, prefix="/api/v1/courses", tags=["courses"])
 app.include_router(modules.router, prefix="/api/v1/modules", tags=["modules"])
 app.include_router(lessons.router, prefix="/api/v1", tags=["lessons"])
 app.include_router(tests.router, prefix="/api/v1", tags=["tests"])
