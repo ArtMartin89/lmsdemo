@@ -91,6 +91,7 @@ const LessonEditor: React.FC<LessonEditorProps> = ({
   lessonNumber,
   onBack,
 }) => {
+  const navigate = useNavigate();
   const [content, setContent] = useState('');
   const [files, setFiles] = useState<string[]>([]);
   const [loading, setLoading] = useState(true);

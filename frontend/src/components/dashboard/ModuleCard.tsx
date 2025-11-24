@@ -8,7 +8,7 @@ interface ModuleCardProps {
   module: {
     id: string
     title: string
-    description: string
+    description?: string
     total_lessons: number
   }
   progress?: {
@@ -73,7 +73,9 @@ const ModuleCard: React.FC<ModuleCardProps> = ({ module, progress, grade }) => {
       <div className="flex justify-between items-start mb-4">
         <div>
           <h3 className="text-xl font-bold mb-2">{module.title}</h3>
-          <p className="text-gray-600 text-sm">{module.description}</p>
+          {module.description && (
+            <p className="text-gray-600 text-sm">{module.description}</p>
+          )}
         </div>
         {grade !== undefined && (
           <div className="text-2xl font-bold text-blue-600">
